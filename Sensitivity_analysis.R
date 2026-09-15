@@ -1,8 +1,3 @@
-# Sensitivity analysis: hyperparameter robustness, input perturbation,
-# gradient analysis, and monotonicity verification
-# Estimated runtime: ~30 minutes
-# Requires: data_objects.rds, model_objects.rds, spnn_objects.rds
-#           spnn_default_model.pt, spnn_final_model.pt
 
 library(torch)
 library(tidyverse)
@@ -10,7 +5,6 @@ library(caret)
 library(xgboost)
 library(e1071)
 
-# Load saved objects
 data_obj  <- readRDS("data_objects.rds")
 model_obj <- readRDS("model_objects.rds")
 spnn_obj  <- readRDS("spnn_objects.rds")
@@ -37,13 +31,13 @@ X_train_t <- torch_tensor(as.matrix(X_train_sc), dtype=torch_float())
 y_train_t <- torch_tensor(matrix(y_train_sc, ncol=1), dtype=torch_float())
 X_test_t  <- torch_tensor(as.matrix(X_test_sc),  dtype=torch_float())
 
-# Reload torch models
+
 result_best$model    <- torch_load("spnn_final_model.pt")
 result_default$model <- torch_load("spnn_default_model.pt")
 result_best$model$eval()
 result_default$model$eval()
 
-# Network definitions
+
 net <- nn_module("ClotNet",
   initialize=function() {
     self$fc1 <- nn_linear(5,128); self$fc2 <- nn_linear(128,128)
@@ -124,7 +118,7 @@ evaluate_model <- function(model, x_te_t=X_test_t,
        R2=round(cor(y_te,y_pred)^2,4))
 }
 
-# Tuned lambda values
+
 lm <- best_lambdas$lambda_mono
 ls <- best_lambdas$lambda_str
 lk <- best_lambdas$lambda_smooth
@@ -140,7 +134,7 @@ train_eval_spnn <- function(lambda_mono, lambda_str, lambda_smooth, lambda_l2,
   list(model=m, RMSE=e$RMSE, R2=e$R2, pred=e$pred)
 }
 
-# Lambda sensitivity analysis
+
 lambda_multipliers  <- c(0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10.0)
 lambda_names        <- c("lambda_mono","lambda_str","lambda_smooth","lambda_l2")
 lambda_tuned        <- c(lm, ls, lk, ll)
@@ -185,7 +179,7 @@ lambda_sens_summary <- lambda_sens_results %>%
   arrange(desc(Range_RMSE))
 write.csv(lambda_sens_summary, "lambda_sensitivity_summary.csv", row.names=FALSE)
 
-# Input perturbation stability
+
 noise_fractions <- c(0, 0.05, 0.10, 0.20, 0.30, 0.50)
 n_noise_reps    <- 10
 feature_sds     <- apply(X_train, 2, sd)
@@ -262,7 +256,7 @@ legend("topleft", legend=names(model_cols),
        col=model_cols, lty=model_lty, lwd=2, cex=0.85)
 dev.off()
 
-# Gradient-based feature sensitivity
+
 mono_dir <- c(-1, 1, 1, -1, -1)
 names(mono_dir) <- predictors
 
@@ -314,7 +308,6 @@ axis(2, at=c(0,0.5,1), labels=c("1","midpoint",nrow(hm_scaled)), las=1)
 box()
 dev.off()
 
-# Monotonicity robustness under input noise
 noise_fractions_mono <- c(0, 0.05, 0.10, 0.20)
 n_mono_reps          <- 20
 mono_robust_results  <- data.frame()
@@ -355,9 +348,10 @@ for(frac in noise_fractions_mono) {
       SD_compliance=round(sd_comp[j]*100,2)))
   }
 }
-
 write.csv(mono_robust_results, "monotonicity_robustness.csv", row.names=FALSE)
 
+
+                         
 png("monotonicity_robustness.png", width=1000, height=650, res=150)
 feat_cols <- c("steelblue","coral","seagreen","mediumpurple","goldenrod")
 names(feat_cols) <- predictors
